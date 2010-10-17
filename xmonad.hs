@@ -56,6 +56,8 @@ import System.Exit
 
 import Text.Regex.PCRE
 
+import Network.BSD
+    
 doNoBorders :: ManageHook -- Query (Endo WindowSet) -> ReaderT Window X (Endo Windowset)
 doNoBorders = do
   w <- ask
@@ -177,8 +179,10 @@ intenseWhite = "#ffffff"
 
 gray = "#525252"
 
-dzenFont = "dejavu\\ sans:size=10"
-dzenFontMono = "dejavu\\ sans\\ mono:size=10"
+dzenFont h | h == "capcom" = "dejavu\\ sans:size=10"
+           | h == "spirit" = "dejavu\\ sans:size=8"
+dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=10"
+               | h == "spirit" = "dejavu\\ sans\\ mono:size=8"
 
 tabFont = "-*-profont-*-*-*-*-14-*-*-*-*-*-*-*"
     
@@ -256,13 +260,29 @@ bluetileMouseBindings (XConfig {XMonad.modMask = modMask'}) = M.fromList $
     ]-}
              
 main = do
-    h <- spawnPipe $
-        "dzen-launcher.pl -w 560 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont ++ "\\\" --- "
-                      ++ "-w 220 -x 341 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont ++ "\\\" --- "
-                      ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
-                      ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
-                      ++ "-w 223 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono ++ "\\\""
-    -- spawn "sleep 2; /home/lazor/bin/systrayfix.sh --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 22 --transparent true --tint 0x000000 --widthtype pixel --margin 1385"
+    hn <- getHostName
+    h <- case hn of
+           "spirit" -> do
+               h2 <- spawnPipe $
+                       "dzen-launcher.pl -w 300 -y 786 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-w 212 -x 260 -y 786 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "                      
+                       ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
+                       ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                       ++ "-w 200 -x 1166 -y 786 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\" --- "
+                       ++ "-w 150 -x 472 -y 786 -fg \\\"" ++ green ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                       ++ "-w 555 -x 622 -y 786 -fg \\\"" ++ red ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
+               spawn "sleep 20; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 18 --transparent true --tint 0x000000 --widthtype pixel --margin 880"
+               return h2    
+           "capcom" ->
+               spawnPipe $
+                       "dzen-launcher.pl -w 560 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-w 220 -x 341 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
+                       ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                       ++ "-w 223 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\""
+           otherwise -> spawnPipe "dzen2"
 
     replace
     xmonad $ desktopConfig
