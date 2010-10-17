@@ -84,6 +84,7 @@ myManageHook = composeAll . concat $
       , (fmap (=~ ".*Steam\\.exe.*") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ ".*Wine.*") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ ".*[Pp]lasma.*") $ stringProperty "WM_CLASS") --> doIgnore
+      , (fmap (=~ "SparkleShare") $ stringProperty "WM_CLASS") --> doFloat
       ]
     ] where
 
