@@ -179,9 +179,9 @@ intenseWhite = "#ffffff"
 
 gray = "#525252"
 
-dzenFont h | h == "capcom" = "dejavu\\ sans:size=10"
+dzenFont h | h == "capcom" = "dejavu\\ sans:size=13"
            | h == "spirit" = "dejavu\\ sans:size=8"
-dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=10"
+dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=13"
                | h == "spirit" = "dejavu\\ sans\\ mono:size=8"
 
 tabFont = "-*-profont-*-*-*-*-14-*-*-*-*-*-*-*"
@@ -277,11 +277,11 @@ main = do
                return h2    
            "capcom" ->
                spawnPipe $
-                       "dzen-launcher.pl -w 560 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                       ++ "-w 220 -x 341 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       "dzen-launcher.pl -w 540 -h 21 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-w 220 -h 21 -x 320 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                        ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
                        ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
-                       ++ "-w 223 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\""
+                       ++ "-w 223 -h 21 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\""
            otherwise -> spawnPipe "dzen2"
 
     replace
