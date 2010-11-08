@@ -85,8 +85,9 @@ myManageHook = composeAll . concat $
       , (fmap (=~ ".*[Zz]enity.*") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ ".*Steam\\.exe.*") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ ".*Wine.*") $ stringProperty "WM_CLASS") --> doFloat
-      , (fmap (=~ ".*[Pp]lasma.*") $ stringProperty "WM_CLASS") --> doIgnore
+      , (fmap (=~ ".*[Pp]lasma.*") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ "SparkleShare") $ stringProperty "WM_CLASS") --> doFloat
+      , (fmap (=~ "Extracting file...") $ stringProperty "WM_NAME") --> doFloat
       ]
     ] where
 
@@ -160,7 +161,7 @@ backgroundBlack = "#000000"
 darkYellow = "#D37C18"
 
 black = "#3A3A3A"
-~red = "#F92673"
+red = "#F92673"
 green = "#9AD22A"
 yellow = "#FD951D"
 blue = "#66DDEF"
@@ -179,14 +180,14 @@ intenseWhite = "#ffffff"
 
 gray = "#525252"
 
-dzenFont h | h == "capcom" = "dejavu\\ sans:size=13"
+dzenFont h | h == "capcom" = "dejavu\\ sans:size=12"
            | h == "spirit" = "dejavu\\ sans:size=8"
-dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=13"
+dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=12"
                | h == "spirit" = "dejavu\\ sans\\ mono:size=8"
 
 tabFont = "-*-profont-*-*-*-*-14-*-*-*-*-*-*-*"
     
-myPP h = defaultPP
+myPP (Just h) = defaultPP
          { ppCurrent = wrap ("^fg(" ++ red ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)[") "]^p(2)^fg()^bg()"
          , ppVisible = wrap ("^fg(" ++ blue ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)[") "]^p(2)^fg()^bg()"
          , ppHidden = wrap ("^fg(" ++ green ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)") "^p(2)^fg()^bg()"
@@ -236,6 +237,7 @@ myPP h = defaultPP
          --, ppExtras  = [logMail]
          , ppOutput  = hPutStrLn h -- . (++) " "
          }
+myPP Nothing = defaultPP
 
 myScratchpads = [ NS "Volume Control" "pavucontrol" (title =? "Volume Control") (customFloating $ W.RationalRect (1/3) (1/6) (1/3) (2/3))
                 -- , NS "Agenda" "xemacs -e \"(org-agenda-list)\"" (title =? "*Org Agenda*") (customFloating $ W.RationalRect (2/3) (2/3) (1/3) (1/3))
@@ -273,16 +275,18 @@ main = do
                        ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
                        ++ "-w 555 -x 622 -y 786 -fg \\\"" ++ red ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                        ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
-               spawn "sleep 20; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 18 --transparent true --tint 0x000000 --widthtype pixel --margin 880"
-               return h2    
-           "capcom" ->
-               spawnPipe $
-                       "dzen-launcher.pl -w 540 -h 21 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                       ++ "-w 220 -h 21 -x 320 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                       ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
-                       ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
-                       ++ "-w 223 -h 21 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\""
-           otherwise -> spawnPipe "dzen2"
+               spawn "sleep 5; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 18 --transparent true --tint 0x000000 --widthtype pixel --margin 880"
+               return $ Just h2    
+           "capcom" -> do
+               h2 <- spawnPipe $
+                       "dzen-launcher.pl -w 330 -h 25 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       -- ++ "-w 220 -h 21 -x 320 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       -- ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
+                       -- ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                       -- ++ "-w 223 -h 21 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\""
+               -- spawn "sleep 5; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 220 --height 21 --transparent true --tint 0x000000 --widthtype pixel --margin 1478"
+               return $ Just h2
+           otherwise -> spawnPipe "dzen2" >>= return . Just
 
     replace
     xmonad $ desktopConfig
@@ -326,11 +330,11 @@ main = do
         ]
         `additionalKeys`
         ([ ((mod4Mask, xK_F1),
-            spawn "xemacs")
+             spawn "xemacs")
          , ((mod4Mask, xK_F2),
-            spawn "urxvt -title '*Remember*' -e bash -c \"/home/lazor/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
+             spawn "urxvt -title '*Remember*' -e bash -c \"/home/lazor/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
          , ((mod4Mask, xK_F3),
-            spawn "conkeror")
+             spawn "conkeror")
          , ((mod4Mask, xK_F4),
             spawn "xwanderlust")
          , ((mod4Mask, xK_F5),
@@ -349,7 +353,7 @@ main = do
             spawn "dbus-send --print-reply --dest=org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout int32:1 int32:-1 int32:1")
          , ((mod4Mask, xK_q), 
             spawn "ps ax | grep dzen | awk '{print $1}' | xargs kill"
-            -- >> spawn "killall -9 trayer"
+            >> spawn "killall -9 trayer"
             -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
             >> spawn "xmonad --recompile; xmonad --restart")
 
