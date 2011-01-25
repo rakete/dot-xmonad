@@ -40,6 +40,7 @@ import XMonad.Layout.MouseResizableTile
 import XMonad.Layout.Named
 import XMonad.Layout.PositionStoreFloat
 import XMonad.Layout.WindowSwitcherDecoration
+import XMonad.Layout.StackTile
     
 import XMonad.Actions.NoBorders
 import XMonad.Actions.CycleWindows
@@ -78,6 +79,8 @@ myManageHook = composeAll . concat $
       , (fmap (=~ "^Moving.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "^Transferring.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "^Progress.*") $ stringProperty "WM_NAME") --> doFloat
+      , (fmap (=~ "^Deleting.*") $ stringProperty "WM_NAME") --> doFloat
+      , (fmap (=~ "^Document.Print.Status.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "^Drive Calculator: DCbase\\.dcd.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "Drive.*Calculator") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ "Osmos") $ stringProperty "WM_NAME") --> doFloat
@@ -88,6 +91,8 @@ myManageHook = composeAll . concat $
       , (fmap (=~ ".*[Pp]lasma.*") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ "SparkleShare") $ stringProperty "WM_CLASS") --> doFloat
       , (fmap (=~ "Extracting file...") $ stringProperty "WM_NAME") --> doFloat
+      , (fmap (=~ "Mumble.*") $ stringProperty "WM_NAME") --> doFloat
+      , (fmap (=~ "^Authorization.Dialog.*") $ stringProperty "WM_NAME") --> doFloat
       ]
     ] where
 
@@ -125,13 +130,15 @@ myLayout =
     --spacing 2 $
     reflectHoriz $
     smartBorders $
-    fixed ||| (spiral (6/7)) ||| full ||| (reflectHoriz $ mosaicalt)
+    fixed ||| downspiral ||| full
   where
     mosaicalt = MosaicAlt M.empty
     dishes = Dishes 2 (1/6)
     tiled  = Tall 1 (3/100) (1/2)
     full = Full
     fixed = FixedColumn 1 20 120 10
+    stack = StackTile 3 (3/100) (1/2)
+    downspiral = spiralWithDir South XMonad.Layout.Spiral.CW (6/7)
     tilingDeco l = windowSwitcherDecorationWithButtons shrinkText defaultThemeWithButtons (draggingVisualizer l)
     floatingDeco l = buttonDeco shrinkText defaultThemeWithButtons l
 
@@ -279,7 +286,7 @@ main = do
                return $ Just h2    
            "capcom" -> do
                h2 <- spawnPipe $
-                       "dzen-launcher.pl -w 330 -h 25 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       "dzen-launcher.pl -w 345 -h 25 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                        -- ++ "-w 220 -h 21 -x 320 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                        -- ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
                        -- ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
@@ -293,7 +300,7 @@ main = do
         { terminal = "konsole"
         , modMask = mod4Mask -- use the Windows button as mod
         , logHook =
-            currentWorkspaceOnTop >>
+            --currentWorkspaceOnTop >>
             ewmhDesktopsLogHook >>
             setWMName "LG3D" >>
             (dynamicLogWithPP $ myPP h)
@@ -308,8 +315,8 @@ main = do
         , borderWidth = myBorderWidth
         , focusFollowsMouse = True
         , handleEventHook = ewmhDesktopsEventHook
-                                `mappend` fullscreenEventHook
-                                `mappend` restoreMinimizedEventHook
+                                --`mappend` fullscreenEventHook
+                                --`mappend` restoreMinimizedEventHook
                                 --`mappend` serverModeEventHook' bluetileCommands
                                 --`mappend` positionStoreEventHook
         --, mouseBindings = bluetileMouseBindings
@@ -386,7 +393,6 @@ main = do
          , ((mod4Mask .|. shiftMask, xK_e), windows W.swapDown)
 
          , ((mod4Mask, xK_c), cycleRecentWindows [xK_Super_R] xK_c xK_v)
-         , ((mod4Mask, xK_v), cycleRecentWindows [xK_Super_R] xK_v xK_c)
 
          , ((mod4Mask, xK_m), withFocused minimizeWindow)
          , ((mod4Mask .|. shiftMask, xK_m), sendMessage RestoreNextMinimizedWin)
