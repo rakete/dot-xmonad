@@ -93,6 +93,7 @@ myManageHook = composeAll . concat $
       , (fmap (=~ "Extracting file...") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "Mumble.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "^Authorization.Dialog.*") $ stringProperty "WM_NAME") --> doFloat
+      , (fmap (=~ "^ImageMagick:.*") $ stringProperty "WM_NAME") --> doFloat
       ]
     ] where
 
