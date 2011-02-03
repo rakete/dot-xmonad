@@ -281,7 +281,7 @@ main = do
                        ++ "-w 200 -x 1166 -y 786 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\" --- "
                        ++ "-w 150 -x 472 -y 786 -fg \\\"" ++ green ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                        ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
-                       ++ "-w 555 -x 622 -y 786 -fg \\\"" ++ red ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       ++ "-w 555 -x 610 -y 786 -fg \\\"" ++ red ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                        ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
                spawn "sleep 5; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 18 --transparent true --tint 0x000000 --widthtype pixel --margin 880"
                return $ Just h2    
