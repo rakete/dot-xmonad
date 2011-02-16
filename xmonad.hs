@@ -415,6 +415,9 @@ main = do
          , ((mod4Mask .|. shiftMask, xK_u), windows W.swapUp)
          , ((mod4Mask .|. shiftMask, xK_e), windows W.swapDown)
 
+         , ((mod4Mask, xK_Tab), windows W.focusDown)
+         , ((mod4Mask, xK_backslash), windows W.focusDown)
+
          , ((mod4Mask, xK_c), cycleRecentWindows [xK_Super_R] xK_c xK_v)
 
          , ((mod4Mask, xK_m), withFocused minimizeWindow)
