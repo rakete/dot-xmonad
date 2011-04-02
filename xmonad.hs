@@ -1,10 +1,18 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 import XMonad
 import XMonad.Config.Desktop
-import XMonad.Config.Bluetile
     
-import qualified XMonad.StackSet as W -- to shift and float windows
+import qualified XMonad.StackSet as S
+
 import qualified Data.Map as M
 import Data.Monoid
+import Data.Maybe (fromMaybe,isNothing)
+import Data.List (find)
+
+import Control.Monad
+import Control.Arrow (second)
 
 import XMonad.Hooks.EwmhDesktops
 import XMonad.Hooks.ManageDocks
@@ -37,10 +45,12 @@ import XMonad.Layout.DraggingVisualizer
 import XMonad.Layout.Maximize
 import XMonad.Layout.Minimize
 import XMonad.Layout.MouseResizableTile
+import XMonad.Layout.ResizableTile
 import XMonad.Layout.Named
 import XMonad.Layout.PositionStoreFloat
 import XMonad.Layout.WindowSwitcherDecoration
 import XMonad.Layout.StackTile
+--import XMonad.Layout.IndependentScreens
     
 import XMonad.Actions.NoBorders
 import XMonad.Actions.CycleWindows
@@ -61,12 +71,49 @@ import Text.Regex.PCRE
 
 import Network.BSD
     
-doNoBorders :: ManageHook -- Query (Endo WindowSet) -> ReaderT Window X (Endo Windowset)
-doNoBorders = do
-  w <- ask
-  liftX $ withDisplay $ \d -> io $ setWindowBorderWidth d w 0
-  doF . W.float w . snd =<< liftX (floatLocation w)
+-- TODO extract colors from .Xdefaults
+foregroundWhite = "#ffffff"
+backgroundBlack = "#000000"
 
+darkYellow = "#D37C18"
+
+black = "#3A3A3A"
+red = "#F92673"
+green = "#9AD22A"
+yellow = "#FD951D"
+blue = "#66DDEF"
+magenta = "#9B6DFE"
+cyan = "#5E7175"
+white = "#DFDFDA"
+
+intenseBlack = "#3c3c3c"
+intenseRed = "#F96098"
+intenseGreen = "#A7CF58"
+intenseYellow = "#ff8c00"
+intenseBlue = "#88E3EF"
+intenseMagenta = "#B08BFF"
+intenseCyan = "#769CA3"
+intenseWhite = "#ffffff"
+               
+gray = "#525252"
+
+dzenFont h | h == "capcom" = "dejavu\\ sans:size=12"
+           | h == "spirit" = "dejavu\\ sans:size=8"
+dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=12"
+               | h == "spirit" = "dejavu\\ sans\\ mono:size=8"
+
+tabFont = "-*-profont-*-*-*-*-14-*-*-*-*-*-*-*"        
+
+-- doNoBorders :: ManageHook -- Query (Endo WindowSet) -> ReaderT Window X (Endo Windowset)
+-- doNoBorders = do
+--   w <- ask
+--   liftX $ withDisplay $ \d -> io $ setWindowBorderWidth d w 0
+--   doF . W.float w . snd =<< liftX (floatLocation w)
+
+myNormalBorderColor  = intenseBlack -- "#d4d7d0"
+myFocusedBorderColor = intenseYellow
+myBorderWidth = 2
+         
 myManageHook = composeAll . concat $
     [ [ className =? c --> doFloat | c <- myFloats]
     , [ title =? t --> doFloat | t <- myFloats]
@@ -96,6 +143,7 @@ myManageHook = composeAll . concat $
       , (fmap (=~ "Mumble.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "^Authorization.Dialog.*") $ stringProperty "WM_NAME") --> doFloat
       , (fmap (=~ "^ImageMagick:.*") $ stringProperty "WM_NAME") --> doFloat
+      , (fmap (=~ ".*kinect.*") $ stringProperty "WM_NAME") --> doFloat
       ]
     ] where
 
@@ -123,124 +171,75 @@ myManageHook = composeAll . concat $
                    ,"<unknown>"
                    ]
 
+data TwoScreen sl ol a = TwoScreen ScreenId sl ol
+                         deriving (Show, Read)
+
+instance (LayoutClass sl a, LayoutClass ol a) => LayoutClass (TwoScreen (sl a) (ol a)) a where
+    -- glance at the current screen to determine which layout to run
+    runLayout (S.Workspace i (TwoScreen s sl ol) ms) r = do
+        mts <- findScreenByTag i
+        case liftM ((== s) . S.screen) mts of
+            Just True -> fmap (second . fmap $ \nsl -> TwoScreen s nsl ol)
+                       $ runLayout (S.Workspace i sl ms) r
+            _ -> fmap (second . fmap $ \nol -> TwoScreen s sl nol)
+               $ runLayout (S.Workspace i ol ms) r
+
+    -- route messages to both sub-layouts (ick)
+    handleMessage l@(TwoScreen s sl ol) m = do
+        msl <- handleMessage sl m
+        mol <- handleMessage ol m
+        return $ if isNothing msl && isNothing mol
+         then Nothing
+         else Just $ TwoScreen s (fromMaybe sl msl) (fromMaybe ol mol)
+
+    description (TwoScreen s sl ol) = "TwoScreen " ++ (description sl)
+
+findScreenByTag i =
+    gets (S.screens . windowset) >>= return . find ((== i) . (S.tag . S.workspace))
+
+mkTwoScreen :: (LayoutClass sl a, LayoutClass ol a) => Int -> (sl a) -> (ol a) -> TwoScreen (sl a) (ol a) a
+mkTwoScreen i = TwoScreen (S i) 
+
 myLayout =
-    avoidStruts $
-    minimize $
-    maximize $
-    boringWindows $
+    --avoidStruts $
+    --minimize $
+    --maximize $
+    --boringWindows $
     mkToggle (single REFLECTX) $
     mkToggle (single REFLECTY) $
     --spacing 2 $
     reflectHoriz $
     smartBorders $
-    fixed ||| downspiral ||| full
+    (mkTwoScreen 0 resizeable full) ||| (mkTwoScreen 0 leftspiral full) ||| (mkTwoScreen 0 downspiral full) 
   where
     mosaicalt = MosaicAlt M.empty
     dishes = Dishes 2 (1/6)
     tiled  = Tall 1 (3/100) (1/2)
     full = Full
-    fixed = FixedColumn 1 20 120 10
+    fixed = FixedColumn 1 5 120 10
     stack = StackTile 3 (3/100) (1/2)
     downspiral = spiralWithDir South XMonad.Layout.Spiral.CW (6/7)
-    tilingDeco l = windowSwitcherDecorationWithButtons shrinkText defaultThemeWithButtons (draggingVisualizer l)
-    floatingDeco l = buttonDeco shrinkText defaultThemeWithButtons l
+    leftspiral = spiralWithDir East XMonad.Layout.Spiral.CW (6/7)
+    resizeable = ResizableTall 1 (3/100) (1/2) []
 
-myTabTheme = defaultTheme { activeColor = darkYellow
-                          , inactiveColor = gray
-                          --, urgentColor = yellow
-                          , activeBorderColor = intenseYellow
-                          , inactiveBorderColor = backgroundBlack
-                          --, urgentBorderColor = yellow
-                          , activeTextColor = backgroundBlack
-                          , inactiveTextColor = backgroundBlack
-                          --, urgentTextColor = backgroundBlack
-                          , fontName = tabFont
-                          --, decoWidth =
-                          , decoHeight = 16 }
-
-myWorkspaces = ["1","2","3","4","5","6","7","8","9","10","11","12"]
-
-myNormalBorderColor  = intenseBlack -- "#d4d7d0"
-myFocusedBorderColor = intenseYellow
-myBorderWidth = 2
-
--- TODO extract colors from .Xdefaults
-foregroundWhite = "#ffffff"
-backgroundBlack = "#000000"
-
-darkYellow = "#D37C18"
-
-black = "#3A3A3A"
-red = "#F92673"
-green = "#9AD22A"
-yellow = "#FD951D"
-blue = "#66DDEF"
-magenta = "#9B6DFE"
-cyan = "#5E7175"
-white = "#DFDFDA"
-
-intenseBlack = "#3c3c3c"
-intenseRed = "#F96098"
-intenseGreen = "#A7CF58"
-intenseYellow = "#ff8c00"
-intenseBlue = "#88E3EF"
-intenseMagenta = "#B08BFF"
-intenseCyan = "#769CA3"
-intenseWhite = "#ffffff"
-
-gray = "#525252"
-
-dzenFont h | h == "capcom" = "dejavu\\ sans:size=12"
-           | h == "spirit" = "dejavu\\ sans:size=8"
-dzenFontMono h | h == "capcom" = "dejavu\\ sans\\ mono:size=12"
-               | h == "spirit" = "dejavu\\ sans\\ mono:size=8"
-
-tabFont = "-*-profont-*-*-*-*-14-*-*-*-*-*-*-*"
-    
 myPP (Just h) = defaultPP
          { ppCurrent = wrap ("^fg(" ++ red ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)[") "]^p(2)^fg()^bg()"
-         , ppVisible = wrap ("^fg(" ++ blue ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)[") "]^p(2)^fg()^bg()"
+         , ppVisible = wrap ("^fg(" ++ white ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)[") "]^p(2)^fg()^bg()"
          , ppHidden = wrap ("^fg(" ++ green ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)") "^p(2)^fg()^bg()"
          , ppHiddenNoWindows = wrap ("^fg(" ++ white ++ ")^bg(" ++ backgroundBlack ++ ")^p(2)") "^p(2)^fg()^bg()"
          , ppSep     = " ^fg(grey60)^r(1x12)^fg() "
-         , ppLayout  = dzenColor white "" . (\x -> case x of
-                                                     "Minimize Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize ReflectX Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize ReflectY Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize ReflectY ReflectX Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectX Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY ReflectX Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                     "Minimize Maximize Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral.xbm)"
-                                                     "Minimize Maximize ReflectX Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral-horiz.xbm)"
-                                                     "Minimize Maximize ReflectY Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral-vert.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral-horiz-vert.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectX Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral.xbm)"
-                                                     "Minimize Maximize ReflectY ReflectX Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral-horiz-vert.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY ReflectX Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral-vert.xbm)"
-                                                     "Minimize Maximize MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize ReflectX MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize ReflectY MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize ReflectY ReflectX MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectX MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY ReflectX MosaicAlt" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                     "Minimize Maximize FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-right.xbm)"
-                                                     "Minimize Maximize ReflectX FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-left.xbm)"
-                                                     "Minimize Maximize ReflectY FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-right.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-left.xbm)"
-                                                     "Minimize Maximize ReflectY ReflectX FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-left.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectX FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-right.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY ReflectX FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-right.xbm)"
-                                                     "Minimize Maximize Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-bottom.xbm)"
-                                                     "Minimize Maximize ReflectX Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-bottom.xbm)"
-                                                     "Minimize Maximize ReflectY Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-top.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-top.xbm)"
-                                                     "Minimize Maximize ReflectY ReflectX Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-top.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectX Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-bottom.xbm)"
-                                                     "Minimize Maximize ReflectX ReflectY ReflectX Dishes 2 (1 % 6)" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mirror-top.xbm)"
-                                                     _ -> pad x
-                                                 )
+         , ppLayout  = dzenColor white "" . (\x ->
+                                                 let tokens = words x
+                                                     xs = filter (=="ReflectX") tokens
+                                                     ys = filter (=="ReflectY") tokens
+                                                     name = head $ filter (\t -> (all (/=t) ["Minimize","Maximize","ReflectX","ReflectY", "TwoScreen"])) tokens
+                                                 in case name of
+                                                      "Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
+                                                      "Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral.xbm)"
+                                                      "FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-right.xbm)"
+                                                      "ResizableTall" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
+                                                      otherwise -> pad name
+                                            )
          , ppUrgent  = dzenColor backgroundBlack yellow . wrap "!" "!"
          , ppTitle   = \_ -> ""
          , ppSort    = getSortByIndex >>= \f -> return $ f . namedScratchpadFilterOutWorkspace
@@ -248,31 +247,8 @@ myPP (Just h) = defaultPP
          , ppOutput  = hPutStrLn h -- . (++) " "
          }
 myPP Nothing = defaultPP
-
-myScratchpads = [ NS "Volume Control" "pavucontrol" (title =? "Volume Control") (customFloating $ W.RationalRect (1/3) (1/6) (1/3) (2/3))
-                -- , NS "Agenda" "xemacs -e \"(org-agenda-list)\"" (title =? "*Org Agenda*") (customFloating $ W.RationalRect (2/3) (2/3) (1/3) (1/3))
-                ]
-    where
-      role = stringProperty "WM_WINDOW_ROLE"
-
---main = replace >> xmonad bluetileConfig
-
-
-{-bluetileMouseBindings :: XConfig Layout -> M.Map (KeyMask, Button) (Window -> X ())
-bluetileMouseBindings (XConfig {XMonad.modMask = modMask'}) = M.fromList $
-    -- mod-button1 %! Move a floated window by dragging
-    [ ((modMask', button1), (\w -> isFloating w >>= \isF -> when (isF) $
-                                focus w >> mouseMoveWindow w >> windows W.shiftMaster))
-    -- mod-button2 %! Switch to next and first layout
-    , ((modMask', button2), (\_ -> sendMessage NextLayout))
-    , ((modMask' .|. shiftMask, button2), (\_ -> sendMessage $ JumpToLayout "Floating"))
-    -- mod-button3 %! Resize a floated window by dragging
-    , ((modMask', button3), (\w -> isFloating w >>= \isF -> when (isF) $
-                                focus w >> mouseResizeWindow w >> windows W.shiftMaster))
-    ]-}
-             
+                
 main = do
-    
     hn <- getHostName
     h <- case hn of
            "spirit" -> do
@@ -309,17 +285,12 @@ main = do
                    return $ Just h2    
            "capcom" -> do
                h2 <- spawnPipe $
-                       "dzen-launcher.pl -w 345 -h 25 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                       -- ++ "-w 220 -h 21 -x 320 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                       -- ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
-                       -- ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
-                       -- ++ "-w 223 -h 21 -x 1697 -y 1200 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\""
-               -- spawn "sleep 5; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 220 --height 21 --transparent true --tint 0x000000 --widthtype pixel --margin 1478"
+                       "dzen-launcher.pl -w 345 -h 25 -y 0 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                return $ Just h2
-           otherwise -> spawnPipe "dzen2" >>= return . Just
+           otherwise -> spawnPipe "dzen2" >>= return . Just                      
 
     replace
-    xmonad $ desktopConfig
+    xmonad $ applyMyKeyBindings $ desktopConfig
         { terminal = "konsole"
         , modMask = mod4Mask -- use the Windows button as mod
         , logHook =
@@ -328,117 +299,135 @@ main = do
             setWMName "LG3D" >>
             (dynamicLogWithPP $ myPP h)
         , manageHook =
-            namedScratchpadManageHook myScratchpads <+>
             manageHook desktopConfig <+>
             myManageHook
         , layoutHook = desktopLayoutModifiers $ myLayout
-        , workspaces = myWorkspaces
+        , workspaces = ["1","2","3","4","5","6","7","8","9","10","11","12"]
         , normalBorderColor = myNormalBorderColor
         , focusedBorderColor = myFocusedBorderColor
         , borderWidth = myBorderWidth
         , focusFollowsMouse = True
         , handleEventHook = ewmhDesktopsEventHook
-                                --`mappend` fullscreenEventHook
-                                --`mappend` restoreMinimizedEventHook
-                                --`mappend` serverModeEventHook' bluetileCommands
-                                --`mappend` positionStoreEventHook
-        --, mouseBindings = bluetileMouseBindings
+                                `mappend` fullscreenEventHook
+                                `mappend` restoreMinimizedEventHook
+                                `mappend` positionStoreEventHook
+        , startupHook = do
+            startupHook desktopConfig
+            switchScreenToDesktop 1 "11"
         }
-        `removeKeys`
-        [ (mod4Mask .|. shiftMask, xK_j)
-        , (mod4Mask .|. shiftMask, xK_k)
-        , (mod4Mask .|. shiftMask, xK_e)
-        , (mod4Mask .|. shiftMask, xK_w)
-        , (mod4Mask .|. shiftMask, xK_o)
-        , (mod4Mask .|. shiftMask, xK_f)
-        , (mod4Mask, xK_j)
-        , (mod4Mask, xK_k)
-        , (mod4Mask, xK_e)
-        , (mod4Mask, xK_w)
-        , (mod4Mask, xK_o)
-        , (mod4Mask, xK_f)
-        ]
-        `additionalKeys`
-        ([ ((mod4Mask, xK_F1),
-             spawn "xemacs")
-         , ((mod4Mask, xK_F2),
-             spawn "urxvt -title '*Remember*' -e bash -c \"/home/lazor/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
-         , ((mod4Mask, xK_F3),
-             spawn "conkeror")
-         , ((mod4Mask, xK_F4),
-            spawn "xwanderlust")
-         , ((mod4Mask, xK_F5),
-            spawn "xemacs -e \"(org-agenda-list)\"")
-         , ((mod4Mask, xK_F6),
-            namedScratchpadAction myScratchpads "Volume Control")
-         , ((mod4Mask, xK_F7),
-            spawn "amarok")
 
-         , ((mod4Mask, xK_Return),
-            spawn "krunner")
+switchScreenToDesktop sc d = do
+    mi <- screenWorkspace sc
+    whenJust mi $ (\i ->
+                    windows (\s ->
+                             let c = S.currentTag s
+                             in S.view c $ S.greedyView d $ S.view i s))
 
+applyMyKeyBindings conf =
+    conf
+    `removeKeys`
+    [ (mod4Mask .|. shiftMask, xK_j)
+    , (mod4Mask .|. shiftMask, xK_k)
+    , (mod4Mask .|. shiftMask, xK_e)
+    , (mod4Mask .|. shiftMask, xK_w)
+    , (mod4Mask .|. shiftMask, xK_o)
+    , (mod4Mask .|. shiftMask, xK_f)
+    , (mod4Mask .|. shiftMask, xK_q)
+    , (mod4Mask .|. shiftMask, xK_r)
+    , (mod4Mask, xK_j)
+    , (mod4Mask, xK_k)
+    , (mod4Mask, xK_e)
+    , (mod4Mask, xK_w)
+    , (mod4Mask, xK_o)
+    , (mod4Mask, xK_f)
+    , (mod4Mask, xK_q)
+    ]
+    `additionalKeys`
+    ([ ((mod4Mask, xK_F1),
+        spawn "xemacs")
+     , ((mod4Mask, xK_F2),
+        spawn "urxvt -title '*Remember*' -e bash -c \"/home/lazor/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
+     , ((mod4Mask, xK_F3),
+        spawn "conkeror")
+     , ((mod4Mask, xK_F4),
+        spawn "xwanderlust")
+     , ((mod4Mask, xK_F5),
+        spawn "xemacs -e \"(org-agenda-list)\"")
+     , ((mod4Mask, xK_F6),
+        spawn "pavucontrol")
+     , ((mod4Mask, xK_F7),
+        spawn "amarok")
+     , ((mod4Mask, xK_F8),
+        spawn "konsole")
+     , ((mod4Mask, xK_Return),
+        spawn "krunner")
+     , ((mod4Mask .|. shiftMask, xK_Escape),
+        -- spawn "touch /home/lazor/.xmonad/dosystrayfix"
+        spawn "dbus-send --print-reply --dest=org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout int32:1 int32:-1 int32:1")
+     , ((mod4Mask, xK_Escape), 
+        spawn "ps ax | grep dzen | awk '{print $1}' | xargs kill"
+        >> spawn "killall -9 trayer"
+        -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
+        >> spawn "xmonad --recompile; xmonad --restart")
+     , ((mod4Mask, xK_g), sendMessage $ IncMasterN 1)
+     , ((mod4Mask .|. shiftMask, xK_g), sendMessage $ IncMasterN (-1))
+     , ((mod4Mask, xK_r), sendMessage Expand) -- >> withFocused (sendMessage . expandWindowAlt))
+     , ((mod4Mask, xK_s), sendMessage Shrink) -- >> withFocused (sendMessage . shrinkWindowAlt))
+     , ((mod4Mask, xK_a), sendMessage MirrorExpand)
+     , ((mod4Mask, xK_y), sendMessage MirrorShrink)
+     --, ((mod4Mask .|. shiftMask, xK_r), sendMessage Taller >> withFocused (sendMessage . tallWindowAlt))
+     --, ((mod4Mask .|. shiftMask, xK_s), sendMessage Wider >> withFocused (sendMessage . wideWindowAlt))
+     , ((mod4Mask .|. controlMask, xK_space), sendMessage resetAlt)
+     , ((mod4Mask, xK_x), sendMessage $ Toggle REFLECTX)
+     , ((mod4Mask .|. shiftMask, xK_x), sendMessage $ Toggle REFLECTY)
+     , ((mod4Mask, xK_b), withFocused toggleBorder)
+     , ((mod4Mask, xK_n), windows $ (\s ->
+                                         let ws = takeWhile (/=S.currentTag s) (workspaces conf)
+                                             prev_workspace = case ws of
+                                                                [] -> last (workspaces conf)
+                                                                otherwise -> last ws
+                                         in S.greedyView prev_workspace s))
+     , ((mod4Mask, xK_i), windows $ (\s ->
+                                         let ws = reverse $ takeWhile (/=S.currentTag s) $ reverse (workspaces conf)
+                                             next_workspace = case ws of
+                                                                [] -> head (workspaces conf)
+                                                                otherwise -> head ws
+                                         in S.greedyView next_workspace s))
+     , ((mod4Mask, xK_u), windows S.focusUp)
+     , ((mod4Mask, xK_e), windows S.focusDown)
+     , ((mod4Mask .|. shiftMask, xK_u), windows S.swapUp)
+     , ((mod4Mask .|. shiftMask, xK_e), windows S.swapDown)
+     , ((mod4Mask, xK_Tab), windows S.focusDown)
+     , ((mod4Mask, xK_backslash), windows S.focusDown)
+     , ((mod4Mask, xK_c), cycleRecentWindows [xK_Super_R] xK_c xK_v)               
+     , ((mod4Mask, xK_m), withFocused minimizeWindow)
+     , ((mod4Mask .|. shiftMask, xK_m), sendMessage RestoreNextMinimizedWin)              
+     , ((mod4Mask, xK_d), toggleWS)               
+     ] ++
+     [ ((m .|. mod4Mask, k), windows $ f i)
+           | (i, k) <- zip (workspaces conf) ([xK_1 .. xK_6] ++ [xK_7 .. xK_9] ++ [xK_0,xK_equal,xK_bar])
+           , (f, m) <- [(S.greedyView, 0), (S.shift, shiftMask)]
+     ] ++
+     [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
+           | (key, sc) <- zip [xK_l, xK_z] [0..]
+           , (f, m) <- [(S.view, 0), (S.shift, shiftMask)]
+     ] ++
+     [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
+           | (key, sc) <- zip [xK_w, xK_f] [0..]
+     , (f, m) <- [(S.view, 0), (S.shift, shiftMask)]
+     ])
 
-         , ((mod4Mask .|. shiftMask, xK_q),
-            -- spawn "touch /home/lazor/.xmonad/dosystrayfix"
-            spawn "dbus-send --print-reply --dest=org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout int32:1 int32:-1 int32:1")
-         , ((mod4Mask, xK_q), 
-            spawn "ps ax | grep dzen | awk '{print $1}' | xargs kill"
-            >> spawn "killall -9 trayer"
-            -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
-            >> spawn "xmonad --recompile; xmonad --restart")
-
-         , ((mod4Mask, xK_r), sendMessage Expand >> withFocused (sendMessage . expandWindowAlt)) -- >> sendMessage Taller >> sendMessage Expand)
-         , ((mod4Mask, xK_s), sendMessage Shrink >> withFocused (sendMessage . shrinkWindowAlt)) -- >> sendMessage Wider >> sendMessage Shrink)
-         , ((mod4Mask .|. shiftMask, xK_d), withFocused (sendMessage . tallWindowAlt))
-         , ((mod4Mask .|. shiftMask, xK_s), withFocused (sendMessage . wideWindowAlt))
-         , ((mod4Mask .|. controlMask, xK_space), sendMessage resetAlt)
-
-         , ((mod4Mask, xK_x), sendMessage $ Toggle REFLECTX)
-         , ((mod4Mask, xK_y), sendMessage $ Toggle REFLECTY)
-         , ((mod4Mask, xK_b), withFocused toggleBorder)
-
-         , ((mod4Mask, xK_n), windows $ (\s ->
-             let ws = takeWhile (/=W.currentTag s) myWorkspaces
-                 prev_workspace = case ws of
-                                     [] -> last myWorkspaces
-                                     otherwise -> last ws
-             in W.greedyView prev_workspace s))
-         , ((mod4Mask, xK_i), windows $ (\s ->
-             let ws = reverse $ takeWhile (/=W.currentTag s) $ reverse myWorkspaces
-                 next_workspace = case ws of
-                                     [] -> head myWorkspaces
-                                     otherwise -> head ws
-             in W.greedyView next_workspace s))
-
-         , ((mod4Mask, xK_u), windows W.focusUp)
-         , ((mod4Mask, xK_e), windows W.focusDown)
-         , ((mod4Mask .|. shiftMask, xK_u), windows W.swapUp)
-         , ((mod4Mask .|. shiftMask, xK_e), windows W.swapDown)
-
-         , ((mod4Mask, xK_Tab), windows W.focusDown)
-         , ((mod4Mask, xK_backslash), windows W.focusDown)
-
-         , ((mod4Mask, xK_c), cycleRecentWindows [xK_Super_R] xK_c xK_v)
-
-         , ((mod4Mask, xK_m), withFocused minimizeWindow)
-         , ((mod4Mask .|. shiftMask, xK_m), sendMessage RestoreNextMinimizedWin)
-                   
-         , ((mod4Mask, xK_g), toggleWS)
-           
-         ] ++
-
-         [ ((m .|. mod4Mask, k), windows $ f i)
-             | (i, k) <- zip myWorkspaces ([xK_1 .. xK_6] ++ [xK_7 .. xK_9] ++ [xK_0,xK_equal,xK_bar])
-             , (f, m) <- [(W.greedyView, 0), (W.shift, shiftMask)]
-         ] ++
-
-         [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
-             | (key, sc) <- zip [xK_l, xK_z] [0..]
-             , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]
-         ] ++
-
-         [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
-             | (key, sc) <- zip [xK_w, xK_f] [0..]
-             , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]
-         ]
-         )
+-- data WrapType = Current | Visible | Hidden | HiddenNoWindows
+    
+-- independentWrap t s1 s2 id =
+--     case t of
+--       Current ->
+--           if (fst $ unmarshall id) == 0 then
+--               wrap s1 s2 (snd $ unmarshall id)
+--           else
+--               ""
+--       Visible ->
+--           snd $ unmarshall id
+--       otherwise ->
+--           id
+    
