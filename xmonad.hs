@@ -323,6 +323,17 @@ switchScreenToDesktop sc d = do
                              let c = S.currentTag s
                              in S.view c $ S.greedyView d $ S.view i s))
 
+shiftByFollow :: Int -> X ()
+shiftByFollow d = do
+  i <- wsBy d
+  windows $ S.shift i
+  windows $ S.view i
+
+
+wsBy :: Int -> X (WorkspaceId)
+wsBy = findWorkspace getSortByIndex Next AnyWS
+
+       
 applyMyKeyBindings conf =
     conf
     `removeKeys`
@@ -341,26 +352,27 @@ applyMyKeyBindings conf =
     , (mod4Mask, xK_o)
     , (mod4Mask, xK_f)
     , (mod4Mask, xK_q)
+    , (mod4Mask, xK_l)
     ]
     `additionalKeys`
     ([ ((mod4Mask, xK_F1),
-        spawn "xemacs")
+        spawn "kdesudo -u lazor /home/lazor/bin/xemacsclient.sh")
      , ((mod4Mask, xK_F2),
         spawn "urxvt -title '*Remember*' -e bash -c \"/home/lazor/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
      , ((mod4Mask, xK_F3),
-        spawn "conkeror")
+        spawn "xdg-open ./.local/share/applications/conkeror.desktop")
      , ((mod4Mask, xK_F4),
-        spawn "xwanderlust")
+        spawn "kdesudo -u lazor /home/lazor/bin/xwanderlust.sh")
      , ((mod4Mask, xK_F5),
-        spawn "xemacs -e \"(org-agenda-list)\"")
+        spawn "/home/lazor/bin/xemacsclient.sh -e \"(org-agenda-list)\"")
      , ((mod4Mask, xK_F6),
-        spawn "pavucontrol")
+        spawn "kdesudo -u lazor pavucontrol")
      , ((mod4Mask, xK_F7),
-        spawn "amarok")
+        spawn "kdesudo -u lazor amarok")
      , ((mod4Mask, xK_F8),
-        spawn "konsole")
+        spawn "kdesudo -u lazor konsole")
      , ((mod4Mask, xK_Return),
-        spawn "krunner")
+        spawn "kdesudo -u lazor krunner")
      , ((mod4Mask .|. shiftMask, xK_Escape),
         -- spawn "touch /home/lazor/.xmonad/dosystrayfix"
         spawn "dbus-send --print-reply --dest=org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout int32:1 int32:-1 int32:1")
@@ -369,6 +381,11 @@ applyMyKeyBindings conf =
         >> spawn "killall -9 trayer"
         -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
         >> spawn "xmonad --recompile; xmonad --restart")
+
+
+
+
+
      , ((mod4Mask, xK_g), sendMessage $ IncMasterN 1)
      , ((mod4Mask .|. shiftMask, xK_g), sendMessage $ IncMasterN (-1))
      , ((mod4Mask, xK_r), sendMessage Expand) -- >> withFocused (sendMessage . expandWindowAlt))
@@ -377,41 +394,46 @@ applyMyKeyBindings conf =
      , ((mod4Mask, xK_y), sendMessage MirrorShrink)
      --, ((mod4Mask .|. shiftMask, xK_r), sendMessage Taller >> withFocused (sendMessage . tallWindowAlt))
      --, ((mod4Mask .|. shiftMask, xK_s), sendMessage Wider >> withFocused (sendMessage . wideWindowAlt))
+
      , ((mod4Mask .|. controlMask, xK_space), sendMessage resetAlt)
      , ((mod4Mask, xK_x), sendMessage $ Toggle REFLECTX)
      , ((mod4Mask .|. shiftMask, xK_x), sendMessage $ Toggle REFLECTY)
      , ((mod4Mask, xK_b), withFocused toggleBorder)
-     , ((mod4Mask, xK_n), windows $ (\s ->
-                                         let ws = takeWhile (/=S.currentTag s) (workspaces conf)
-                                             prev_workspace = case ws of
-                                                                [] -> last (workspaces conf)
-                                                                otherwise -> last ws
-                                         in S.greedyView prev_workspace s))
-     , ((mod4Mask, xK_i), windows $ (\s ->
-                                         let ws = reverse $ takeWhile (/=S.currentTag s) $ reverse (workspaces conf)
-                                             next_workspace = case ws of
-                                                                [] -> head (workspaces conf)
-                                                                otherwise -> head ws
-                                         in S.greedyView next_workspace s))
-     , ((mod4Mask, xK_u), windows S.focusUp)
-     , ((mod4Mask, xK_e), windows S.focusDown)
-     , ((mod4Mask .|. shiftMask, xK_u), windows S.swapUp)
-     , ((mod4Mask .|. shiftMask, xK_e), windows S.swapDown)
-     , ((mod4Mask, xK_Tab), windows S.focusDown)
+
+
+
+
+
+       
+     , ((mod4Mask, xK_n), do
+          shiftByFollow (-1)
+       )
+     , ((mod4Mask, xK_i), do
+          shiftByFollow 1
+       )
+     , ((mod4Mask, xK_u), windows S.swapUp)
+     , ((mod4Mask, xK_e), windows S.swapDown)] ++
+
+     -- [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
+     --       | (key, sc) <- zip [xK_l, xK_z] [0..]
+     -- , (f, m) <- [(S.view, 0), (S.shift, shiftMask)]] ++
+
+
+
+
+     
+     [ ((mod4Mask .|. shiftMask, xK_backslash), cycleRecentWindows [xK_Shift_R, xK_Shift_L] xK_backslash xK_Tab)
+     , ((mod4Mask .|. shiftMask, xK_Tab), cycleRecentWindows [xK_Shift_R, xK_Shift_L] xK_Tab xK_backslash)
      , ((mod4Mask, xK_backslash), windows S.focusDown)
-     , ((mod4Mask, xK_c), cycleRecentWindows [xK_Super_R] xK_c xK_v)               
+     , ((mod4Mask, xK_Tab), windows S.focusUp)
+
+     --, ((mod4Mask, xK_c), cycleRecentWindows [xK_Super_R,xK_Super_L] xK_c xK_c)
      , ((mod4Mask, xK_m), withFocused minimizeWindow)
-     , ((mod4Mask .|. shiftMask, xK_m), sendMessage RestoreNextMinimizedWin)              
-     , ((mod4Mask, xK_d), toggleWS)               
-     ] ++
+     , ((mod4Mask .|. shiftMask, xK_m), sendMessage RestoreNextMinimizedWin)
+     , ((mod4Mask, xK_d), toggleWS)] ++
      [ ((m .|. mod4Mask, k), windows $ f i)
            | (i, k) <- zip (workspaces conf) ([xK_1 .. xK_6] ++ [xK_7 .. xK_9] ++ [xK_0,xK_equal,xK_bar])
-           , (f, m) <- [(S.greedyView, 0), (S.shift, shiftMask)]
-     ] ++
-     [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
-           | (key, sc) <- zip [xK_l, xK_z] [0..]
-           , (f, m) <- [(S.view, 0), (S.shift, shiftMask)]
-     ] ++
+           , (f, m) <- [(S.greedyView, 0), (S.shift, shiftMask)]] ++
      [ ((m .|. mod4Mask, key), screenWorkspace sc >>= flip whenJust (windows . f))
            | (key, sc) <- zip [xK_w, xK_f] [0..]
      , (f, m) <- [(S.view, 0), (S.shift, shiftMask)]
