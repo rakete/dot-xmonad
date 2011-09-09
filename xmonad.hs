@@ -598,14 +598,23 @@ main = do
 
   sessionfloats <- newIORef []
 
+  -- BEWARE OF THE UGLY HACK!
+  spawn "/bin/bash -e /home/lazor/bin/resolution.sh > /tmp/resolution"
+  spawn "/bin/bash -e /home/lazor/bin/resolution-offset.sh > /tmp/resolution-offset"
+  sleep 1
+  resolution <- readFile "/tmp/resolution"
+  resolution_offset <- readFile "/tmp/resolution-offset"
+  putStr resolution
+  putStr resolution_offset
+
+  r <- (try (return $! read resolution_offset :: IO Int) :: IO (Either SomeException Int))
+  offset <- case r of
+              Left e -> return 0
+              Right x -> return x
+
   hn <- getHostName
   h <- case hn of
          "spirit" -> do
-                 -- BEWARE OF THE UGLY HACK!
-                 spawn "/bin/bash -e /home/lazor/bin/resolution.sh > /tmp/resolution"
-                 sleep 1
-                 resolution <- readFile "/tmp/resolution"
-                 putStr resolution
                  h2 <- case resolution of
                          "1920x1080\n" -> do
                                         h3 <- spawnPipe $ "dzen-launcher.pl -w 300 -y 1080 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
@@ -634,7 +643,7 @@ main = do
                  return $ Just h2
          "capcom" -> do
                  h2 <- spawnPipe $
-                       "dzen-launcher.pl -w 325 -h 25 -y 0 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
+                       "dzen-launcher.pl -x " ++ (show offset) ++ " -w 325 -h 25 -y 0 -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ backgroundBlack ++ "\\\" -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                  return $ Just h2
          otherwise -> spawnPipe "dzen2" >>= return . Just
 
