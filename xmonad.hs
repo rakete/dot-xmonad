@@ -21,6 +21,7 @@ import Data.Typeable
 import Control.Monad
 import Control.Monad.Trans
 import Control.Arrow (second)
+import Control.Exception
 
 import XMonad.Hooks.EwmhDesktops
 import XMonad.Hooks.ManageDocks
@@ -240,7 +241,7 @@ controlFocus lastnumwin lastfocus lastmouse = do
         if (current_num_windows < prev_num_windows)
          -- user just closed a window -> restore focus
          then restoreFocusN lastfocus lastmouse 1 >> return ()
-         -- user opened a window -> do nothing, because the previous focus is still the head on our stack
+         -- user opened a window -> remember focus (put currently focused window at position 0)
          else rememberFocusN lastfocus lastmouse 0
        -- this alternative deals with focus changes through mouse movement _only_
        -- (focus changes through keyboard events are handled seperatly by focusUpRemember/focusDownRemember)
@@ -367,25 +368,35 @@ sessionFloatsMaybeManageHook ref = do
      then fmap Just doFloat
      else return $ Nothing
 
-createSessionFloat :: SessionFloatsRef -> Window -> X ()
-createSessionFloat ref w = do
+sessionFloat :: SessionFloatsRef -> LastFocusRef -> LastMousePosRef -> Window -> X ()
+sessionFloat ref lastFocusRef lastMousePosRef w = do
   ps <- withDisplay (\d -> fmap catMaybes $ mapM (getStringProperty d w) ["WM_CLASS","WM_NAME"])
   case ps of
-    (p:_) -> io $ modifyIORef ref (\sf -> p : sf)
+    (p:_) -> do
+            (io $ readIORef ref) >>= \strings -> case () of
+                                                   _ | null strings || all (/=p) strings -> do
+                                                           windows $ S.float w $ S.RationalRect (1%4) (1%4) (1%2) (1%2)
+                                                           io $ modifyIORef ref (\sf -> p : sf)
+                                                     | otherwise -> do
+                                                           rememberFocusN lastFocusRef lastMousePosRef 1
+                                                           windows $ S.sink w
+                                                           io $ modifyIORef ref (\sf -> filter (/=p) sf)
     otherwise -> return ()
 
-removeSessionFloat :: SessionFloatsRef -> Window -> X ()
-removeSessionFloat ref w = do
-  ps <- withDisplay (\d -> fmap catMaybes $ mapM (getStringProperty d w) ["WM_CLASS","WM_NAME"])
-  case ps of
-    (p:_) -> io $ modifyIORef ref (\sf -> filter (/=p) sf)
-    otherwise -> return ()
 
-doNoBorder :: ManageHook
-doNoBorder = do
-  w <- ask
-  liftX $ toggleBorder w
-  idHook
+-- createSessionFloat :: SessionFloatsRef -> Window -> X ()
+-- createSessionFloat ref w = do
+--   ps <- withDisplay (\d -> fmap catMaybes $ mapM (getStringProperty d w) ["WM_CLASS","WM_NAME"])
+--   case ps of
+--     (p:_) -> io $ modifyIORef ref (\sf -> p : sf)
+--     otherwise -> return ()
+
+-- removeSessionFloat :: SessionFloatsRef -> Window -> X ()
+-- removeSessionFloat ref w = do
+--   ps <- withDisplay (\d -> fmap catMaybes $ mapM (getStringProperty d w) ["WM_CLASS","WM_NAME"])
+--   case ps of
+--     (p:_) -> io $ modifyIORef ref (\sf -> filter (/=p) sf)
+--     otherwise -> return ()
 
 myManageHook sessionfloats lastfocus = composeAll
     [ workspaceByPos
@@ -562,7 +573,7 @@ myLayout =
     mkToggle (single MIRROR) $
     -- spacing 4 $
     reflectHoriz $
-    smartBorders $
+    -- smartBorders $
     boringAuto $
     (mkTwoScreen 0 resizable full) ||| (mkTwoScreen 0 threecol full)
   where
@@ -734,27 +745,31 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
 -- LEFT HAND
 
      -- \
-     , ((mod4Mask, xK_backslash), restoreFocusN lastFocusRef lastMousePosRef 2 >> return ())
-     , ((mod4Mask .|. controlMask, xK_backslash), cycleRecentWindows [xK_Super_L,xK_Super_R,xK_Shift_L,xK_Shift_R] xK_backslash xK_Tab)
+     , ((controlMask, xK_backslash), focusUpRemember lastFocusRef lastMousePosRef)
+     , ((mod4Mask, xK_backslash), focusUpRemember lastFocusRef lastMousePosRef)
+     , ((controlMask .|. shiftMask, xK_backslash), focusDownRemember lastFocusRef lastMousePosRef)
+     , ((mod4Mask .|. shiftMask, xK_backslash), focusDownRemember lastFocusRef lastMousePosRef)
      -- Tab
-     , ((mod4Mask, xK_Tab), focusDownRemember lastFocusRef lastMousePosRef)
-     , ((mod4Mask .|. shiftMask, xK_Tab), focusUpRemember lastFocusRef lastMousePosRef)
-     , ((mod4Mask .|. controlMask, xK_Tab), cycleRecentWindows [xK_Super_L,xK_Super_R,xK_Shift_L,xK_Shift_R] xK_Tab xK_backslash)
+     , ((mod4Mask, xK_Tab), restoreFocusN lastFocusRef lastMousePosRef 2 >> return ())
 
      -- y
-     , ((mod4Mask, xK_y), toggleWS )
-     , ((mod4Mask .|. shiftMask, xK_y), sendMessage $ Toggle REFLECTY)
+     , ((controlMask, xK_y), rememberFocusN lastFocusRef lastMousePosRef 1 >> toggleWS >> restoreFocusN lastFocusRef lastMousePosRef 1 >> return ())
+     , ((mod4Mask, xK_y),  rememberFocusN lastFocusRef lastMousePosRef 1 >> toggleWS >> restoreFocusN lastFocusRef lastMousePosRef 1 >> return ())
+     --, ((mod4Mask .|. shiftMask, xK_y), sendMessage $ Toggle REFLECTY)
+     , ((mod4Mask .|. shiftMask, xK_y), do sendMessage $ Toggle MIRROR)
      -- w
      , ((mod4Mask, xK_w), prevWS)
-     , ((mod4Mask .|. shiftMask, xK_w), shiftToPrev >> prevWS)
+     , ((mod4Mask .|. shiftMask, xK_w), shiftToPrev)
+
      -- f
      , ((mod4Mask, xK_f), nextWS )
-     , ((mod4Mask .|. shiftMask, xK_f), shiftToNext >> nextWS)
+     , ((mod4Mask .|. shiftMask, xK_f), shiftToNext)
+
      -- g
-     , ((mod4Mask, xK_g), nextScreen >> shiftPrevScreen >> prevScreen   )
+     , ((mod4Mask, xK_g), withFocused $ \w -> sessionFloat sessionfloats lastFocusRef lastMousePosRef w)
+
      -- p
-     , ((mod4Mask, xK_p), windows S.swapUp)
-     , ((mod4Mask .|. shiftMask, xK_p), sendMessage $ IncMasterN 1)
+     , ((mod4Mask, xK_p), nextScreen >> shiftPrevScreen >> prevScreen   )
 
      -- a
      , ((mod4Mask, xK_a), nextScreen)
@@ -766,53 +781,51 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
      , ((mod4Mask, xK_s), sendMessage Shrink)
      , ((mod4Mask .|. shiftMask, xK_s), sendMessage MirrorShrink)
      -- t
-     , ((mod4Mask, xK_t), windows S.shiftMaster)
+     , ((mod4Mask, xK_t), withFocused $ \w -> windows (S.shiftMaster . S.sink w))
+
+     --, ((mod4Mask .|. shiftMask, xK_t), sendMessage $ Toggle REFLECTX)
      -- d
-     , ((mod4Mask, xK_d), windows S.swapDown)
-     , ((mod4Mask .|. shiftMask, xK_d), sendMessage $ IncMasterN (-1))
+     , ((mod4Mask, xK_d), shiftNextScreen)
 
      -- ,
-     , ((mod4Mask, xK_comma),  withFocused $ \w -> do
-          windows $ S.sink w
-          removeSessionFloat sessionfloats w
-       )
-     , ((mod4Mask .|. shiftMask, xK_comma), withFocused toggleBorder)
      -- q
-
-     , ((mod4Mask, xK_q), withFocused $ \w -> do
-          windows $ S.float w $ S.RationalRect (1%4) (1%4) (1%2) (1%2)
-          createSessionFloat sessionfloats w
-
-       )
-
      , ((mod4Mask .|. shiftMask, xK_q), kill)
      -- x
-     , ((mod4Mask, xK_x), sendMessage RestoreNextMinimizedWin)
-     , ((mod4Mask .|. shiftMask, xK_x), sendMessage $ Toggle REFLECTX)
+     , ((mod4Mask, xK_x), windows S.swapDown)
+     , ((mod4Mask .|. shiftMask, xK_x), sendMessage $ IncMasterN (-1))
+
      -- c
-     , ((mod4Mask, xK_c), withFocused minimizeWindow)
+     , ((mod4Mask, xK_c), windows S.swapUp)
+     , ((mod4Mask .|. shiftMask, xK_c), sendMessage $ IncMasterN 1)
+
      -- v
-     , ((mod4Mask, xK_v), shiftNextScreen)
+     , ((mod4Mask, xK_v), do
+          sendMessage ToggleStruts
+          withFocused (sendMessage . maximizeRestore))
+
      -- b
-     , ((mod4Mask, xK_b), sendMessage $ Toggle MIRROR)
+     , ((mod4Mask, xK_b), withFocused toggleBorder)
 
 
 -- RIGHT HAND
 
      -- j
      -- l
+     , ((mod4Mask, xK_l), prevWS)
+     , ((mod4Mask .|. shiftMask, xK_l), shiftToPrev >> prevWS)
+
      -- u
      , ((mod4Mask, xK_u), do sendMessage $ Go U; rememberFocusN lastFocusRef lastMousePosRef 0)
      , ((mod4Mask .|. shiftMask, xK_u), sendMessage $ Swap U)
 
      -- z
-     -- , [ ]
+     , ((mod4Mask, xK_z), nextWS )
+     , ((mod4Mask .|. shiftMask, xK_z), shiftToNext >> nextWS)
+     -- - [ ]
      -- h
-     , ((mod4Mask, xK_h), cycleRecentWindows [xK_Super_L,xK_Super_R] xK_h xK_k)
      -- n
      , ((mod4Mask, xK_n), do sendMessage $ Go L; rememberFocusN lastFocusRef lastMousePosRef 0)
      , ((mod4Mask .|. shiftMask, xK_n), sendMessage $ Swap L)
-
      -- e
      , ((mod4Mask, xK_e), do sendMessage $ Go D; rememberFocusN lastFocusRef lastMousePosRef 0)
      , ((mod4Mask .|. shiftMask, xK_e), sendMessage $ Swap D)
@@ -823,43 +836,67 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
 
      -- o
      -- ~
+
      -- k
-     , ((mod4Mask, xK_k), cycleRecentWindows [xK_Super_L,xK_Super_R] xK_k xK_h)
      -- m
-     , ((mod4Mask, xK_m), do
-          sendMessage ToggleStruts
-          withFocused (sendMessage . maximizeRestore))
 
-     -- _ . '
+     -- - . '
 
 
 
 
 
-     , ((mod4Mask, xK_1), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "1")
+
+     , ((mod4Mask, xK_1), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "1"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_1), windows $ S.shift "1")
-     , ((mod4Mask, xK_2), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "2")
+     , ((mod4Mask, xK_2), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "2"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_2), windows $ S.shift "2")
-     , ((mod4Mask, xK_3), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "3")
+     , ((mod4Mask, xK_3), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "3"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_3), windows $ S.shift "3")
-     , ((mod4Mask, xK_4), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "4")
+     , ((mod4Mask, xK_4), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "4"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_4), windows $ S.shift "4")
-     , ((mod4Mask, xK_5), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "5")
+     , ((mod4Mask, xK_5), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "5"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_5), windows $ S.shift "5")
-     , ((mod4Mask, xK_6), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "6")
+     , ((mod4Mask, xK_6), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "6"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_6), windows $ S.shift "6")
-     , ((mod4Mask, xK_7), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "7")
+     , ((mod4Mask, xK_7), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "7"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_7), windows $ S.shift "7")
-     , ((mod4Mask, xK_8), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "8")
+     , ((mod4Mask, xK_8), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "8"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_8), windows $ S.shift "8")
-     , ((mod4Mask, xK_9), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "9")
+     , ((mod4Mask, xK_9), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "9"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_9), windows $ S.shift "9")
-     , ((mod4Mask, xK_0), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "10")
+     , ((mod4Mask, xK_0), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "10"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_0), windows $ S.shift "10")
-     , ((mod4Mask, xK_ampersand), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "11")
-     , ((shiftMask .|. mod4Mask, xK_equal), windows $ S.shift "11")
-     , ((mod4Mask, xK_bar), do rememberFocus lastFocusRef lastMousePosRef; windows $ S.greedyView "12")
+     , ((mod4Mask, xK_ampersand), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "11"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((shiftMask .|. mod4Mask, xK_ampersand), windows $ S.shift "11")
+     , ((mod4Mask, xK_bar), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "12"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
      , ((shiftMask .|. mod4Mask, xK_bar), windows $ S.shift "12")
+
+     , ((controlMask, xK_1), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "1"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_1), windows $ S.shift "1")
+     , ((controlMask, xK_2), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "2"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_2), windows $ S.shift "2")
+     , ((controlMask, xK_3), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "3"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_3), windows $ S.shift "3")
+     , ((controlMask, xK_4), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "4"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_4), windows $ S.shift "4")
+     , ((controlMask, xK_5), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "5"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_5), windows $ S.shift "5")
+     , ((controlMask, xK_6), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "6"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_6), windows $ S.shift "6")
+     , ((controlMask, xK_7), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "7"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_7), windows $ S.shift "7")
+     , ((controlMask, xK_8), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "8"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_8), windows $ S.shift "8")
+     , ((controlMask, xK_9), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "9"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_9), windows $ S.shift "9")
+     , ((controlMask, xK_0), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "10"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_0), windows $ S.shift "10")
+     , ((controlMask, xK_ampersand), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "11"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_ampersand), windows $ S.shift "11")
+     , ((controlMask, xK_bar), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "12"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
+     , ((controlMask .|. shiftMask, xK_bar), windows $ S.shift "12")
+
 
      -- ] ++
 
