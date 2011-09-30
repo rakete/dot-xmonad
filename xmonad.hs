@@ -92,6 +92,9 @@ import Text.Regex.PCRE
 
 import Network.BSD
 
+-- import Data.List (sort)
+-- import DBus.Client.Simple
+
 -- TODO extract colors from .Xdefaults
 foregroundWhite = "#ffffff"
 backgroundBlack = "#000000"
@@ -869,76 +872,3 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
                                      , (xK_0,"0")
                                      , (xK_ampersand,"11")
                                      , (xK_bar,"12") ]]))
-
-     -- [ ((mod4Mask, xK_1), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "1"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_1), windows $ S.shift "1")
-     -- , ((mod4Mask, xK_2), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "2"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_2), windows $ S.shift "2")
-     -- , ((mod4Mask, xK_3), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "3"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_3), windows $ S.shift "3")
-     -- , ((mod4Mask, xK_4), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "4"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_4), windows $ S.shift "4")
-     -- , ((mod4Mask, xK_5), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "5"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_5), windows $ S.shift "5")
-     -- , ((mod4Mask, xK_6), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "6"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_6), windows $ S.shift "6")
-     -- , ((mod4Mask, xK_7), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "7"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_7), windows $ S.shift "7")
-     -- , ((mod4Mask, xK_8), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "8"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_8), windows $ S.shift "8")
-     -- , ((mod4Mask, xK_9), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "9"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_9), windows $ S.shift "9")
-     -- , ((mod4Mask, xK_0), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "10"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_0), windows $ S.shift "10")
-     -- , ((mod4Mask, xK_ampersand), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "11"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_ampersand), windows $ S.shift "11")
-     -- , ((mod4Mask, xK_bar), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "12"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((shiftMask .|. mod4Mask, xK_bar), windows $ S.shift "12")
-
-     -- , ((controlMask, xK_1), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "1"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_1), windows $ S.shift "1")
-     -- , ((controlMask, xK_2), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "2"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_2), windows $ S.shift "2")
-     -- , ((controlMask, xK_3), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "3"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_3), windows $ S.shift "3")
-     -- , ((controlMask, xK_4), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "4"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_4), windows $ S.shift "4")
-     -- , ((controlMask, xK_5), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "5"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_5), windows $ S.shift "5")
-     -- , ((controlMask, xK_6), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "6"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_6), windows $ S.shift "6")
-     -- , ((controlMask, xK_7), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "7"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_7), windows $ S.shift "7")
-     -- , ((controlMask, xK_8), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "8"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_8), windows $ S.shift "8")
-     -- , ((controlMask, xK_9), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "9"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_9), windows $ S.shift "9")
-     -- , ((controlMask, xK_0), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "10"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_0), windows $ S.shift "10")
-     -- , ((controlMask, xK_ampersand), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "11"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_ampersand), windows $ S.shift "11")
-     -- , ((controlMask, xK_bar), do rememberFocusN lastFocusRef lastMousePosRef 1; windows $ S.greedyView "12"; restoreFocusN lastFocusRef lastMousePosRef 1; return ())
-     -- , ((controlMask .|. shiftMask, xK_bar), windows $ S.shift "12")
-
-
-     -- ] ++
-
-     -- [ ((m .|. mod4Mask, k), windows $ f i)
-     --       | (i, k) <- zip (workspaces conf) ([xK_1 .. xK_6] ++ [xK_7 .. xK_9] ++ [xK_0,xK_equal,xK_bar])
-     --       , (f, m) <- [(S.greedyView, 0), (S.shift, shiftMask)]
-     --])
-
--- data WrapType = Current | Visible | Hidden | HiddenNoWindows
-
--- independentWrap t s1 s2 id =
---     case t of
---       Current ->
---           if (fst $ unmarshall id) == 0 then
---               wrap s1 s2 (snd $ unmarshall id)
---           else
---               ""
---       Visible ->
---           snd $ unmarshall id
---       otherwise ->
---           id
-
