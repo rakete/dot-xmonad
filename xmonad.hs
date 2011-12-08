@@ -1,9 +1,12 @@
+
 {-# OPTIONS_GHC -fglasgow-exts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+
+import Prelude hiding (catch)
 
 import XMonad hiding (splitVertically, splitHorizontallyBy)
 import XMonad.Config.Desktop
@@ -19,7 +22,7 @@ import Data.Ratio
 import Data.Typeable
 
 import Control.Monad
-import Control.Monad.Trans
+import Control.Monad.Trans hiding (liftIO)
 import Control.Arrow (second)
 import Control.Exception
 
@@ -54,7 +57,6 @@ import XMonad.Layout.ButtonDecoration
 import XMonad.Layout.DraggingVisualizer
 --import XMonad.Layout.LayoutCombinators
 --import XMonad.Layout.Maximize
-import XMonad.Layout.Minimize
 import XMonad.Layout.MouseResizableTile
 import XMonad.Layout.ResizableTile
 import XMonad.Layout.Named
@@ -62,7 +64,6 @@ import XMonad.Layout.PositionStoreFloat
 import XMonad.Layout.WindowSwitcherDecoration
 import XMonad.Layout.StackTile
 --import XMonad.Layout.IndependentScreens
-import XMonad.Layout.BoringWindows
 --import XMonad.Layout.ThreeColumns
 import XMonad.Layout.MultiColumns
 import XMonad.Layout.WindowNavigation
@@ -73,6 +74,7 @@ import XMonad.Actions.CycleWindows
 import XMonad.Actions.CycleWS
 import XMonad.Actions.UpdatePointer
 import XMonad.Actions.DeManage
+import XMonad.Actions.UpdateFocus hiding (adjustEventInput)
 
 import XMonad.Util.EZConfig
 import XMonad.Util.Run
@@ -83,6 +85,7 @@ import XMonad.Util.Replace
 
 import XMonad.Hooks.ManageHelpers
 import XMonad.Hooks.InsertPosition
+import XMonad.Hooks.XPropManage
 
 import System.Exit
 import System.Process
@@ -92,8 +95,32 @@ import Text.Regex.PCRE
 
 import Network.BSD
 
--- import Data.List (sort)
--- import DBus.Client.Simple
+import DBus.Types
+import DBus.Client.Simple
+
+import qualified Data.Text as T
+import Control.Concurrent.MVar
+
+import Foreign.C.String
+import Foreign.C.Types
+
+-- project switching abhängig vom workspace switching
+-- switch zu neuem workspace soll projekt nicht komplett unloaden, der state
+-- wird assoziert mit dem vorigen workspace so das er wieder hergestellt
+-- werden kann ohne die startup hooks zu benutzen
+dbusEmitChangedWorkspace :: Client -> IO ()
+dbusEmitChangedWorkspace client = do
+  emit client (objectPath_ $ T.pack "/")
+              (interfaceName_ $ T.pack "org.xmonad")
+              (memberName_ $ T.pack "ChangedWorkspace")
+              [ toVariant $ "foo" ]
+
+  -- client <- connectSession
+  -- requestName client (busName_ $ T.pack "org.xmonad") []
+  -- export client (objectPath_ $ T.pack "/hello")
+  --        [ method (interfaceName_ $ T.pack "org.xmonad") (memberName_ $ T.pack "hello") sayHello ]
+  -- mvar <- newEmptyMVar
+  -- takeMVar mvar
 
 -- TODO extract colors from .Xdefaults
 foregroundWhite = "#ffffff"
@@ -211,6 +238,49 @@ instance LayoutModifier Maximize Window where
 -- ControlFocus
 --
 
+data FocusState = FocusState
+                { focus_history :: M.Map WorkspaceId [Window] }
+
+adjustEventInput :: X ()
+adjustEventInput = withDisplay $ \dpy -> do
+  rootw <- asks theRoot
+  io $ selectInput dpy rootw $  substructureRedirectMask .|. substructureNotifyMask
+                                .|. enterWindowMask .|. leaveWindowMask .|. structureNotifyMask
+                                .|. buttonPressMask .|. pointerMotionMask .|. focusChangeMask
+                                .|. propertyChangeMask
+
+testFocusEvent e@(AnyEvent { ev_event_type = et }) | et == focusIn =
+                                                       do io $ putStrLn "FocusIn"
+                                                          return $ All True
+                                                   | et == focusOut =
+                                                       do io $ putStrLn "FocusOut"
+                                                          return $ All True
+                                                   | et == createNotify =
+                                                       do io $ putStrLn "CreateNotify"
+                                                          return $ All True
+testFocusEvent e@(CrossingEvent { ev_event_type = et }) | et == enterNotify =
+                                                            do io $ putStrLn "EnterNotify"
+                                                               return $ All True
+                                                        | et == leaveNotify =
+                                                            do io $ putStrLn "LeaveNotify"
+                                                               return $ All True
+testFocusEvent e@(DestroyWindowEvent {}) = do
+  when ((ev_event_type e) == destroyNotify) $ io $ putStrLn "DestroyNotify"
+  return $ All True
+testFocusEvent e@(PropertyEvent { ev_atom = a, ev_window = w }) = do
+  d <- asks display
+  root <- asks theRoot
+  c <- io $ internAtom d "_NET_CURRENT_DESKTOP" True
+  when (w == root && a == c) $ do
+    v :: (Maybe [CInt]) <- io $ rawGetWindowProperty 32 d a root
+    io $ putStrLn $ show v
+  return $ All True
+testFocusEvent _ = return $ All True
+
+--focusChangeHandler (PropertyEvent {ev_event_display = d, ev_window = w, ev_atom = a}) = do
+
+
+
 currentNumWindows :: X Int
 currentNumWindows = do
     ws <- gets windowset
@@ -218,7 +288,17 @@ currentNumWindows = do
                (Just s) -> (length $ S.up s) + (length $ S.down s) + (M.size $ S.floating ws) + 1
                otherwise -> 0
 
-type LastNumWindowsRef = IORef Int
+currentNumDesktops :: X ()
+currentNumDesktops = do
+  d <- asks display
+  root <- asks theRoot
+  a <- io $ internAtom d "_NET_NUMBER_OF_DESKTOPS" True
+  t <- io $ getTextProperty d root a
+  l <- io $ wcTextPropertyToTextList d t
+  io $ putStrLn $ show l
+
+
+type LastNumWindowsRef = IORef (M.Map WorkspaceId Int)
 type LastFocusRef = IORef (M.Map WorkspaceId [Window])
 type LastMousePosRef = IORef (Int,Int)
 
@@ -234,13 +314,13 @@ controlFocus lastnumwin lastfocus lastmouse = do
   case ms of
     (Just s) -> do
       let current_num_windows = (length $ S.up s) + (length $ S.down s) + (M.size $ S.floating ws) + 1
-      prev_num_windows <- io $ readIORef lastnumwin
+      prev_num_windows <- io $ readIORef lastnumwin >>= return . fromMaybe 0 . M.lookup wi
       if (current_num_windows /= prev_num_windows)
        -- this alternative deals with newly opened or closed windows
        then do
         io $ writeIORef lastmouse (fromIntegral current_x, fromIntegral current_y)
         io $ putStrLn $ "Writing " ++ (show current_num_windows) ++ " to NumWindowsRef"
-        io $ writeIORef lastnumwin current_num_windows
+        io $ modifyIORef lastnumwin (\m -> M.insert wi current_num_windows m)
         if (current_num_windows < prev_num_windows)
          -- user just closed a window -> restore focus
          then restoreFocusN lastfocus lastmouse 1 >> return ()
@@ -291,7 +371,6 @@ rememberFocusN r m n = do
                liftIO $ putStrLn $ "Remembered that " ++ (show $ fromIntegral $ S.focus s) ++ " had focus at position " ++ (show n)
                liftIO $ putStrLn $ show xs
              otherwise -> return ()
-
     otherwise -> return ()
 
 rememberFocus :: LastFocusRef -> LastMousePosRef -> X ()
@@ -305,6 +384,11 @@ focusUpRemember r m = do
 focusDownRemember :: LastFocusRef -> LastMousePosRef -> X ()
 focusDownRemember r m = do
   windows S.focusDown
+  rememberFocusN r m 0
+
+focusMasterRemember :: LastFocusRef -> LastMousePosRef -> X ()
+focusMasterRemember r m = do
+  windows S.focusMaster
   rememberFocusN r m 0
 
 restoreFocusN :: LastFocusRef -> LastMousePosRef -> Int -> X (Maybe Window)
@@ -357,8 +441,9 @@ doSideFloatWithBorder side border = doFloatDep move
                  else if side `elem` [NE,NC,NW] then 0 + border
                  else {- side `elem` [SE,SC,SW] -}   1-h - border
 
-toManageHook :: (X a) -> Query a
-toManageHook = Query . lift
+-- breaks build when uncommentedf
+-- toManageHook :: (X a) -> Query a
+-- toManageHook = Query . lift
 
 type SessionFloatsRef = IORef [String]
 
@@ -605,10 +690,16 @@ switchScreenToDesktop sc d = do
                              let c = S.currentTag s
                              in S.view c $ S.greedyView d $ S.view i s))
 
+
+data Toggles = Struts | Maximized Window
+            deriving (Eq,Ord,Show)
+type RememberToggles = IORef (M.Map Toggles Bool)
+
 main = do
-  lastnumwin <- newIORef 0
+  lastnumwin <- newIORef M.empty
   lastfocus <- newIORef M.empty
   lastmouse <- newIORef (0,0)
+  toggles <- newIORef M.empty
 
   sessionfloats <- newIORef []
 
@@ -662,7 +753,7 @@ main = do
          otherwise -> spawnPipe "dzen2" >>= return . Just
 
   replace
-  xmonad $ applyMyKeyBindings sessionfloats lastfocus lastmouse $ desktopConfig
+  xmonad $ applyMyKeyBindings sessionfloats lastfocus lastmouse toggles $ desktopConfig
         { terminal = "konsole"
         , modMask = mod4Mask -- use the Windows button as mod
         , logHook =
@@ -681,16 +772,18 @@ main = do
         , borderWidth = myBorderWidth
         , focusFollowsMouse = True
         , handleEventHook = ewmhDesktopsEventHook
-                                `mappend` fullscreenEventHook
-                                `mappend` restoreMinimizedEventHook
-                                --`mappend` positionStoreEventHook
+                            `mappend` fullscreenEventHook
+                            `mappend` restoreMinimizedEventHook
+                            -- `mappend` testFocusEvent
+                            --`mappend` positionStoreEventHook
         , startupHook = do
             startupHook desktopConfig
             switchScreenToDesktop 1 "11"
+            adjustEventInput
         }
 
 
-applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
+applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef toggles conf =
     conf
     `removeKeys`
     [ (mod4Mask .|. shiftMask, xK_j)
@@ -732,13 +825,12 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
         spawn "kdesudo -u lazor konsole")
      , ((mod4Mask, xK_Return),
         spawn "kdesudo -u lazor krunner")
+     , ((mod4Mask, xK_Escape),
+        -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
+        spawn "xmonad --restart")
      , ((mod4Mask .|. shiftMask, xK_Escape),
         -- spawn "touch /home/lazor/.xmonad/dosystrayfix"
         spawn "dbus-send --print-reply --dest=org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout int32:1 int32:-1 int32:1")
-     , ((mod4Mask, xK_Escape),
-        -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
-         spawn "xmonad --restart")
-
      , ((mod4Mask, xK_space), sendMessage NextLayout) --(windows S.shiftMaster) >> sendMessage NextLayout)
      , ((mod4Mask, xK_BackSpace), refresh)
 
@@ -748,16 +840,13 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
 -- LEFT HAND
 
      -- \
-     , ((controlMask, xK_backslash), focusUpRemember lastFocusRef lastMousePosRef)
-     , ((mod4Mask, xK_backslash), focusUpRemember lastFocusRef lastMousePosRef)
-     , ((controlMask .|. shiftMask, xK_backslash), focusDownRemember lastFocusRef lastMousePosRef)
-     , ((mod4Mask .|. shiftMask, xK_backslash), focusDownRemember lastFocusRef lastMousePosRef)
+     , ((mod4Mask, xK_backslash), focusDownRemember lastFocusRef lastMousePosRef)
+     , ((mod4Mask .|. shiftMask, xK_backslash), focusUpRemember lastFocusRef lastMousePosRef)
      -- Tab
      , ((mod4Mask, xK_Tab), restoreFocusN lastFocusRef lastMousePosRef 2 >> return ())
 
      -- y
-     , ((controlMask, xK_y), rememberFocusN lastFocusRef lastMousePosRef 1 >> toggleWS >> restoreFocusN lastFocusRef lastMousePosRef 1 >> return ())
-     , ((mod4Mask, xK_y),  rememberFocusN lastFocusRef lastMousePosRef 1 >> toggleWS >> restoreFocusN lastFocusRef lastMousePosRef 1 >> return ())
+     , ((mod4Mask, xK_y),  toggleWS)
      --, ((mod4Mask .|. shiftMask, xK_y), sendMessage $ Toggle REFLECTY)
      , ((mod4Mask .|. shiftMask, xK_y), do sendMessage $ Toggle MIRROR)
      -- w
@@ -765,7 +854,7 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
      , ((mod4Mask .|. shiftMask, xK_w), shiftToPrev)
 
      -- f
-     , ((mod4Mask, xK_f), nextWS )
+     , ((mod4Mask, xK_f), nextWS)
      , ((mod4Mask .|. shiftMask, xK_f), shiftToNext)
 
      -- g
@@ -785,14 +874,29 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
      , ((mod4Mask .|. shiftMask, xK_s), sendMessage MirrorShrink)
      -- t
      , ((mod4Mask, xK_t), withFocused $ \w -> windows (S.shiftMaster . S.sink w))
+     , ((mod4Mask .|. shiftMask, xK_t), do
+          withFocused $ \focused ->
+              windows (\s ->
+                           case (S.index s) of
+                             [] -> s
+                             (master:_) -> if master == focused
+                                            then S.focusMaster $ S.swapUp s
+                                            else S.shiftMaster $ S.sink focused s
+                      )
+          rememberFocus lastFocusRef lastMousePosRef
+       )
 
      --, ((mod4Mask .|. shiftMask, xK_t), sendMessage $ Toggle REFLECTX)
      -- d
      , ((mod4Mask, xK_d), shiftNextScreen)
 
-     -- ,
+     -- +
+     , ((mod4Mask, xK_plus), sendMessage RestoreNextMinimizedWin)
+
      -- q
+     , ((mod4Mask, xK_q), withFocused minimizeWindow)
      , ((mod4Mask .|. shiftMask, xK_q), kill)
+
      -- x
      , ((mod4Mask, xK_x), windows S.swapDown)
      , ((mod4Mask .|. shiftMask, xK_x), sendMessage $ IncMasterN (-1))
@@ -803,8 +907,31 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef conf =
 
      -- v
      , ((mod4Mask, xK_v), do
-          sendMessage ToggleStruts
-          withFocused (sendMessage . maximizeRestore))
+          withFocused $ \w -> do
+            ts <- io $ readIORef toggles
+            case (M.lookup (Maximized w) ts, M.lookup Struts ts) of
+              x | x == (Just False, Just False) ||
+                  x == (Just False, Nothing) ||
+                  x == (Nothing, Just False) ||
+                  x == (Nothing, Nothing) -> do
+                                sendMessage $ maximizeRestore w
+                                sendMessage ToggleStruts
+                                io $ modifyIORef toggles (M.insert (Maximized w) True)
+                                io $ modifyIORef toggles (M.insert Struts True)
+                | x == (Just True, Just True) -> do
+                                sendMessage $ maximizeRestore w
+                                sendMessage ToggleStruts
+                                io $ modifyIORef toggles (M.insert (Maximized w) False)
+                                io $ modifyIORef toggles (M.insert Struts False)
+                | x == (Just True, Just False) ||
+                  x == (Just True, Nothing) -> do
+                                sendMessage $ maximizeRestore w
+                                io $ modifyIORef toggles (M.insert (Maximized w) False)
+                | x == (Just False, Just True) ||
+                  x == (Nothing, Just True) -> do
+                                sendMessage ToggleStruts
+                                io $ modifyIORef toggles (M.insert Struts False)
+       )
 
      -- b
      , ((mod4Mask, xK_b), withFocused toggleBorder)
