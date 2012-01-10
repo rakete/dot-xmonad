@@ -314,8 +314,18 @@ controlFocus lastnumwin lastfocus lastmouse = do
   case ms of
     (Just s) -> do
       let current_num_windows = (length $ S.up s) + (length $ S.down s) + (M.size $ S.floating ws) + 1
+          current_windows = (S.up s) ++ (S.down s) ++ (fst $ unzip $ M.toList $ S.floating ws)
       prev_num_windows <- io $ readIORef lastnumwin >>= return . fromMaybe 0 . M.lookup wi
-      if (current_num_windows /= prev_num_windows)
+      m <- liftIO $ readIORef lastfocus
+      -- check all existing windows if they match the current head of the focus stack
+      -- if a match is found it means that not the currently focused window was closed
+      -- but some other, for example by pressing ctrl-c in a terminal where a windows
+      -- process is running in the foreground
+      currently_focused_exists <- case M.lookup wi m of
+                                 (Just focus_history) -> do
+                                                return $ any (== (head (focus_history ++ [-1]))) current_windows
+                                 otherwise -> return False
+      if (current_num_windows /= prev_num_windows) && (not currently_focused_exists)
        -- this alternative deals with newly opened or closed windows
        then do
         io $ writeIORef lastmouse (fromIntegral current_x, fromIntegral current_y)
@@ -337,7 +347,7 @@ controlFocus lastnumwin lastfocus lastmouse = do
                    then return ()
                    else do
                      io $ writeIORef lastmouse (fromIntegral current_x, fromIntegral current_y)
-                     liftIO $ putStrLn $ "Remembered Mouse Position at " ++ (show (fromIntegral current_x, fromIntegral current_y))
+                     --liftIO $ putStrLn $ "Remembered Mouse Position at " ++ (show (fromIntegral current_x, fromIntegral current_y))
                      rememberFocusN lastfocus lastmouse 0
            Nothing -> return ()
     otherwise -> return ()
@@ -369,7 +379,7 @@ rememberFocusN r m n = do
             case mxs of
              (Just xs) -> do
                liftIO $ putStrLn $ "Remembered that " ++ (show $ fromIntegral $ S.focus s) ++ " had focus at position " ++ (show n)
-               liftIO $ putStrLn $ show xs
+               --liftIO $ putStrLn $ show xs
              otherwise -> return ()
     otherwise -> return ()
 
