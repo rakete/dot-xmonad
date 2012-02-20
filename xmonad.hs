@@ -512,6 +512,7 @@ myManageHook sessionfloats lastfocus = composeAll
       , (fmap (=~ "^Deleting.*") $ stringProperty "WM_NAME") -?> doSideFloatWithBorder SW 0.02
       , (fmap (=~ "^Document.Print.Status.*") $ stringProperty "WM_NAME") -?> doSideFloatWithBorder SW 0.02
       , (fmap (=~ "^Extracting file...") $ stringProperty "WM_NAME") -?> doSideFloatWithBorder SW 0.02
+      , (fmap (=~ "^File Transfer") $ stringProperty "WM_NAME") -?> doSideFloatWithBorder SW 0.02
 
       , className =? "Xmessage" -?> doCenterFloat
       , (fmap (=~ "^Authorization.Dialog.*") $ stringProperty "WM_NAME") -?> doCenterFloat
