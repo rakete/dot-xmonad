@@ -182,11 +182,11 @@ myPP (Just h) = defaultPP
                                                                                             , "Spacing"
                                                                                             , "1","2","3","4","5","6","7","8","9"])) tokens
                                                  in case name of
-                                                      "Full" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-full.xbm)"
-                                                      "Spiral" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-spiral.xbm)"
-                                                      "FixedColumn" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-tall-right.xbm)"
-                                                      "ResizableTall" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-mosaic.xbm)"
-                                                      "ResizableThreeCol" -> pad "^i(/home/lazor/icons/dzen/dzen/layout-threecol.xbm)"
+                                                      "Full" -> pad "^i(~/icons/dzen/dzen/layout-full.xbm)"
+                                                      "Spiral" -> pad "^i(~/icons/dzen/dzen/layout-spiral.xbm)"
+                                                      "FixedColumn" -> pad "^i(~/icons/dzen/dzen/layout-tall-right.xbm)"
+                                                      "ResizableTall" -> pad "^i(~/icons/dzen/dzen/layout-mosaic.xbm)"
+                                                      "ResizableThreeCol" -> pad "^i(~/icons/dzen/dzen/layout-threecol.xbm)"
                                                       otherwise -> pad name
                                             )
          , ppUrgent  = dzenColor backgroundBlack yellow . wrap "!" "!"
@@ -715,8 +715,8 @@ main = do
   sessionfloats <- newIORef []
 
   -- BEWARE OF THE UGLY HACK!
-  spawn "/bin/bash -e /home/lazor/bin/resolution.sh > /tmp/resolution"
-  spawn "/bin/bash -e /home/lazor/bin/resolution-offset.sh > /tmp/resolution-offset"
+  spawn "/bin/bash -e ~/bin/resolution.sh > /tmp/resolution"
+  spawn "/bin/bash -e ~/bin/resolution-offset.sh > /tmp/resolution-offset"
   sleep 1
   resolution <- readFile "/tmp/resolution"
   resolution_offset <- readFile "/tmp/resolution-offset"
@@ -735,25 +735,25 @@ main = do
                          "1920x1080\n" -> do
                                         h3 <- spawnPipe $ "dzen-launcher.pl -w 300 -y 1080 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                                                       ++ "-w 212 -x 260 -y 1080 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                                                      ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
-                                                      ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                                                      ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(~/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
+                                                      ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(~/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
                                                       ++ "-w 200 -x 1720 -y 1080 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\" --- "
                                                       ++ "-w 150 -x 472 -y 1080 -fg \\\"" ++ green ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                                                      ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                                                      ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(~/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
                                                       ++ "-w 855 -x 610 -y 1080 -fg \\\"" ++ red ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                                                      ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
+                                                      ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(~/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
                                         spawn "sleep 5; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 18 --transparent true --tint 0x000000 --widthtype pixel --margin 1434"
                                         return h3
                          otherwise -> do
                            h3 <- spawnPipe $ "dzen-launcher.pl -w 275 -h 23 -y 0 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
                                         -- ++ "-w 212 -x 260 -y 786 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                                        -- ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
-                                        -- ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                                        -- ++ "-l \\\"^fg\\(" ++ yellow ++ "\\)^i\\(~/icons/dzen/xbm8x8/cpu.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ yellow ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o --- "
+                                        -- ++ "-l \\\"^fg\\(" ++ magenta ++ "\\)^i\\(~/icons/dzen/xbm8x8/mem.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ magenta ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
                                         -- ++ "-w 200 -x 1166 -y 786 -fg \\\"" ++ yellow ++ "\\\" -bg black -p -ta r -fn \\\"" ++ dzenFontMono hn ++ "\\\" --- "
                                         -- ++ "-w 150 -x 472 -y 786 -fg \\\"" ++ green ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                                        -- ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
+                                        -- ++ "-l \\\"^fg\\(" ++ green ++ "\\)^i\\(~/icons/dzen/xbm8x8/bat_full_02.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ green ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5 --- "
                                         -- ++ "-w 555 -x 610 -y 786 -fg \\\"" ++ red ++ "\\\" -bg black -p -ta l -fn \\\"" ++ dzenFont hn ++ "\\\" --- "
-                                        -- ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(/home/lazor/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
+                                        -- ++ "-l \\\"^fg\\(" ++ red ++ "\\)^i\\(~/icons/dzen/xbm8x8/wifi_01.xbm\\)^fg\\(\\) \\\" -fg \\\"" ++ red ++ "\\\" -bg \\\"" ++ gray ++ "\\\" -s o -ss 1 -sw 5"
                            -- spawn "sleep 5; trayer --align left --edge bottom --SetDockType true --SetPartialStrut true --expand true --width 300 --height 18 --transparent true --tint 0x000000 --widthtype pixel --margin 880"
                            return h3
                  return $ Just h2
@@ -819,28 +819,28 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef toggles conf =
     ]
     `additionalKeys`
     ([ ((mod4Mask, xK_F1),
-        spawn "kdesudo -u lazor /home/lazor/bin/xemacsclient.sh")
+        spawn "~/bin/xemacsclient.sh")
      , ((mod4Mask, xK_F2),
-        spawn "urxvt -title '*Remember*' -e bash -c \"/home/lazor/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
+        spawn "urxvt -title '*Remember*' -e bash -c \"~/bin/remember-launcher.sh '-e (make-remember-frame-terminal)'\"")
      , ((mod4Mask, xK_F3),
         spawn "xdg-open ~/.local/share/applications/conkeror.desktop")
      , ((mod4Mask, xK_F4),
-        spawn "kdesudo -u lazor /home/lazor/bin/xwanderlust.sh")
+        spawn "~/bin/xwanderlust.sh")
      , ((mod4Mask, xK_F5),
-        spawn "/home/lazor/bin/xemacsclient.sh -e \"(org-agenda-list)\"")
+        spawn "~/bin/xemacsclient.sh -e \"(org-agenda-list)\"")
      , ((mod4Mask, xK_F6),
         spawn "pavucontrol")
      , ((mod4Mask, xK_F7),
-        spawn "kdesudo -u lazor amarok")
+        spawn "amarok")
      , ((mod4Mask, xK_F8),
-        spawn "kdesudo -u lazor konsole")
+        spawn "konsole")
      , ((mod4Mask, xK_Return),
-        spawn "kdesudo -u lazor krunner")
+        spawn "krunner")
      , ((mod4Mask, xK_Escape),
-        -- >> spawn "/bin/rm /home/lazor/.xmonad/dosystrayfix"
+        -- >> spawn "/bin/rm ~/.xmonad/dosystrayfix"
         spawn "xmonad --restart")
      , ((mod4Mask .|. shiftMask, xK_Escape),
-        -- spawn "touch /home/lazor/.xmonad/dosystrayfix"
+        -- spawn "touch ~/.xmonad/dosystrayfix"
         spawn "dbus-send --print-reply --dest=org.kde.ksmserver /KSMServer org.kde.KSMServerInterface.logout int32:1 int32:-1 int32:1")
      , ((mod4Mask, xK_space), sendMessage NextLayout) --(windows S.shiftMaster) >> sendMessage NextLayout)
      , ((mod4Mask, xK_BackSpace), refresh)
