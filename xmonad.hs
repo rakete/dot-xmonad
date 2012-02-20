@@ -1000,6 +1000,6 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef toggles conf =
                                      , (xK_7,"7")
                                      , (xK_8,"8")
                                      , (xK_9,"9")
-                                     , (xK_0,"0")
+                                     , (xK_0,"10")
                                      , (xK_ampersand,"11")
                                      , (xK_bar,"12") ]]))
