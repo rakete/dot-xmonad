@@ -325,17 +325,17 @@ controlFocus lastnumwin lastfocus lastmouse = do
                                  (Just focus_history) -> do
                                                 return $ any (== (head (focus_history ++ [-1]))) current_windows
                                  otherwise -> return False
-      if (current_num_windows /= prev_num_windows) && (not currently_focused_exists)
+      if (current_num_windows /= prev_num_windows)
        -- this alternative deals with newly opened or closed windows
        then do
         io $ writeIORef lastmouse (fromIntegral current_x, fromIntegral current_y)
         io $ putStrLn $ "Writing " ++ (show current_num_windows) ++ " to NumWindowsRef"
         io $ modifyIORef lastnumwin (\m -> M.insert wi current_num_windows m)
-        if (current_num_windows < prev_num_windows)
-         -- user just closed a window -> restore focus
-         then restoreFocusN lastfocus lastmouse 1 >> return ()
-         -- user opened a window -> remember focus (put currently focused window at position 0)
-         else rememberFocusN lastfocus lastmouse 0
+        case ((current_num_windows < prev_num_windows), currently_focused_exists) of
+          (True, True) -> return ()
+          (True, False) -> restoreFocusN lastfocus lastmouse 1 >> return ()
+          (False, True) -> rememberFocusN lastfocus lastmouse 0
+          (False, False) -> rememberFocusN lastfocus lastmouse 0
        -- this alternative deals with focus changes through mouse movement _only_
        -- (focus changes through keyboard events are handled seperatly by focusUpRemember/focusDownRemember)
        else do
