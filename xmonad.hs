@@ -991,12 +991,6 @@ applyMyKeyBindings sessionfloats lastFocusRef lastMousePosRef toggles conf =
                    restoreFocusN lastFocusRef lastMousePosRef 1;
                    return ())
               , ((shiftMask .|. mod4Mask, key), windows $ S.shift workspace)
-              , ((controlMask, key), do
-                   rememberFocusN lastFocusRef lastMousePosRef 1;
-                   windows $ S.greedyView workspace;
-                   restoreFocusN lastFocusRef lastMousePosRef 1;
-                   return ())
-              , ((shiftMask .|. controlMask, key), windows $ S.shift workspace)
               ] | (key,workspace) <- [ (xK_1,"1")
                                      , (xK_2,"2")
                                      , (xK_3,"3")
